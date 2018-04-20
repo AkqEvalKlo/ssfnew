@@ -4,6 +4,9 @@
 ?SEARCH  =ASC2EBC
 ?SEARCH  =EBC2ASC
 ?SEARCH  =WSYS022
+
+?SEARCH  =SSFPHD1
+
 ?NOLMAP, SYMBOLS, INSPECT
 ?SAVE ALL
 ?SAVEABEND
@@ -89,7 +92,7 @@
 
      05      C9-ANZ              PIC S9(09) COMP.
      05      C9-COUNT            PIC S9(09) COMP.
-     05      c9-DELAY-TIME       PIC S9(09) COMP.
+     05      C9-DELAY-TIME       PIC S9(09) COMP.
 
      05      C18-VAL             PIC S9(18) COMP.
 
@@ -154,6 +157,8 @@
 *--------------------------------------------------------------------*
  01          WORK-FELDER.
      05      W-DUMMY             PIC X(02).
+     
+ 01          ZEILE               PIC X(80) VALUE SPACES.     
 
 *--------------------------------------------------------------------*
 * Datm-Uhrzeitfelder (für TAL-Routine)
@@ -363,10 +368,9 @@
          STOP RUN
      END-IF
 
-*** =>
-*** => weitere Verarbeitung hier einfügen
-*** =>
-
+**  ---> Aufruf verarbeiten
+     PERFORM B100-VERARBEITUNG
+     
 **  ---> Nachlauf: Dateien schiessen
      PERFORM B090-ENDE
      STOP RUN
@@ -381,6 +385,9 @@
  B000-00.
 **  ---> Initialisierung Felder
      PERFORM C000-INIT
+     
+**  ---> Parameter holen
+     PERFORM P100-GETSTARTUPTEXT     
 
      .
  B000-99.
@@ -408,14 +415,14 @@
 **--> Vorbereiten Cursor
       MOVE K-MODUL                     TO ANWENDUNG    OF SSFRFDEF
       MOVE SPACES                      TO MODUL        OF SSFRFDEF
-      MOVE W-FUNKTION                  TO FUNKTION     OF SSFRFDEF
+      MOVE STUP-DEC-FUNKTION           TO FUNKTION     OF SSFRFDEF
       
 **--> Oeffnen Cursor      
       PERFORM S100-OPEN-SSFRFDEF-CURSOR
       IF SSFRFDEF-OPEN 
          CONTINUE
       ELSE
-         MOVE SQLCODE OF SQCLA TO ZEILE
+         MOVE SQLCODE OF SQLCA TO D-NUM4
          DISPLAY " "
          STRING " OPEN Cursor fehlgeschlagen mit SQLCODE: ",
                   D-NUM4
@@ -424,6 +431,7 @@
          DISPLAY " >>> ABBRUCH! <<<"
          DISPLAY " "
          SET PRG-ABBRUCH TO TRUE
+         MOVE ALL SPACES TO ZEILE
          EXIT SECTION
       END-IF
       
@@ -432,7 +440,7 @@
       
 **--> Verarbeitungsschleife ueber alle Einträge LFDNR 1 - X
       PERFORM UNTIL SSFRFDEF-EOD
-                 OR SSFFDEF-NOK
+                 OR SSFRFDEF-NOK
                  OR PRG-ABBRUCH
 
 *       Aufruf Prozesshandler        
@@ -474,14 +482,14 @@
  C100-00.
     
 **--> Jetzt zusammenstellen Aufruf SSFPHD1
-      MOVE    PROG     OF SSFRFDEF      TO PHD-PRG-NAME
-      MOVE    ALT-PROG OF SSFRFDEF      TO PHD-ALT-PFILE
-      MOVE    PRG-STU  OF SSFRFDEF      TO PHD-PRG-STU
-      MOVE    PRG-INF  OF SSFRFDEF      TO PHD-PRG-INF
-      MOVE    PRG-OUTF OF SSFRFDEF      TO PHD-PRG-OUTF
-      MOVE    PRG-OBF  OF SSFRFDEF      TO PHD-PRG-OBF
-      MOVE    SPACES                    TO PHD-FFU
-      MOVE    1024                      TO PHD-ID-LEN
+      MOVE    PROG            OF SSFRFDEF      TO PHD-PRG-NAME
+      MOVE    VAL OF ALT-PROG OF SSFRFDEF      TO PHD-ALT-PFILE
+      MOVE    VAL OF PRG-STU  OF SSFRFDEF      TO PHD-PRG-STU
+      MOVE    VAL OF PRG-INF  OF SSFRFDEF      TO PHD-PRG-INF
+      MOVE    VAL OF PRG-OUTF OF SSFRFDEF      TO PHD-PRG-OUTF
+      MOVE    VAL OF PRG-OBF  OF SSFRFDEF      TO PHD-PRG-OBF
+      MOVE    SPACES                           TO PHD-FFU
+      MOVE    1024                             TO PHD-ID-LEN
 
 *    INTERNE Schnittstelle basteln
      INITIALIZE INTERN-MESSAGE
@@ -504,8 +512,17 @@
  C200-INTERPRET-SYSMSG SECTION.
  C200-00.
     
-**--> MSG-Satz aus der internen Schnittstelle fuellen
-      MOVE    PHD-NDATEN(1:PHD-DATLEN)  TP MSG-SATZ
+**--> MSG-SATZ initialisieren
+      INITIALIZE MSG-SATZ
+      
+**--> MSG-Satz aus der internen Schnittstelle fuellen, falls
+*     vorhanden
+      IF PHD-NDATEN = SPACE
+      OR PHD-DATLEN  = ZERO
+         EXIT SECTION
+      ELSE
+         MOVE    PHD-NDATEN(1:PHD-DATLEN)  TO MSG-SATZ
+      END-IF
       
 **--> Jetzt ist die Rueckgabe da; machen, was auch immer man will
 *     (z.B. behandeln Completion-Code)
@@ -553,21 +570,35 @@
          WHEN -9999 THRU -1
 **                  ---> Fehler aus GetStartUpText
                      MOVE STUP-RESULT TO D-NUM4
-
-*** =>
-*** => weitere Verarbeitung hier einfügen
-*** =>
-
+                     DISPLAY " "
+                     DISPLAY "Fehler bei GETSTARTUPTEXT: " D-NUM4
+                     DISPLAY ">> ABBRUCH <<"
+                     DISPLAY " "
                      SET PRG-ABBRUCH TO TRUE
                      EXIT SECTION
          WHEN ZERO
 **                  ---> kein StartUpText vorhanden
-                     continue
+                     DISPLAY " "
+                     DISPLAY "GETSTARTUPTEXT: Startup-Text fehlt! "
+                     DISPLAY ">> ABBRUCH <<"
+                     DISPLAY " "
+                     SET PRG-ABBRUCH TO TRUE
+                     EXIT SECTION
 
          WHEN OTHER
 **                  ---> StartUpText ist vorhanden in STUP-TEXT
+                     INSPECT STUP-TEXT 
+                        CONVERTING "abcdefghijklmnopqrstuvwxyz"
+                                TO "ABCDEFGHIJKLMNOPQRSTUVWXYZ"                             
+                     UNSTRING STUP-TEXT DELIMITED BY ALL SPACES
+                     INTO     STUP-DEC-FUNKTION,
+                              STUP-DEC-DELAY
+                     IF STUP-DEC-DELAY NUMERIC
+                        MOVE  STUP-DEC-DELAY    TO C9-DELAY-TIME
+                     ELSE
+                        MOVE  ZEROES            TO C9-DELAY-TIME
+                     END-IF
 
-                     continue
      END-EVALUATE
      .
  P100-99.
@@ -582,6 +613,9 @@
      EXEC SQL
          OPEN SSFRFDEF_CURS
      END-EXEC
+     IF SQLCODE OF SQLCA = ZERO
+        SET SSFRFDEF-OPEN TO TRUE
+     END-IF
      .
  S100-99.
      EXIT.
