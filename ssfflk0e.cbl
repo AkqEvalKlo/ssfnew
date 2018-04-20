@@ -1085,6 +1085,8 @@
  F100-00.
  
      MOVE  P-REP-FILE               TO  ASS-FNAME
+
+*--- Mit Create ---
      
 *     ENTER TAL "String^Laenge"   USING  P-REP-FILE, 36
 *                                 GIVING ASS-FNAME-LEN
@@ -1119,6 +1121,8 @@
 *        EXIT SECTION
 *     END-IF
 
+*------ MIT Copy ----
+
 **  ---> Sperrdatei nach Repository kopieren
 
 **--> Holen Kommando
@@ -1152,8 +1156,16 @@
                                            PHD-DATLEN
      MOVE   K-MODUL                     TO PHD-MONNAME
      MOVE   "SSFPHD1M"                  TO PHD-NEXTSERV
-     
+*     
      CALL   "SSFPHD1M"   USING INTERN-MESSAGE   
+
+*    Fuer Systemnachrichten     
+     IF PHD-DATLEN = ZERO
+     OR PHD-NDATEN = SPACE
+        CONTINUE
+     ELSE
+        MOVE PHD-NDATEN(1:PHD-DATLEN)  TO MSG-SATZ
+     END-IF
      
 **  ---> erst mal Sourcefile assignen
      ENTER "COBOLASSIGN" USING  LOCKF
@@ -1513,27 +1525,52 @@
 
 *     Bauen konkreten STARTUP-String
       MOVE ALL SPACES TO AKT-STARTUP-TEXT
-      STRING    STUP-DEC-TXT(CI, 1)         DELIMITED BY SPACE,
-                " "                         DELIMITED BY SIZE,
-                STUP-DEC-PRM(CI, 1)         DELIMITED BY SPACE,
-                " "                         DELIMITED BY SIZE,
-                STUP-DEC-TXT(CI, 2)         DELIMITED BY SPACE,
-                " "                         DELIMITED BY SIZE,
-                STUP-DEC-PRM(CI, 2)         DELIMITED BY SPACE,
-                " "                         DELIMITED BY SIZE,
-                STUP-DEC-TXT(CI, 3)         DELIMITED BY SPACE,
-                " "                         DELIMITED BY SIZE,
-                STUP-DEC-PRM(CI, 3)         DELIMITED BY SPACE,
-                " "                         DELIMITED BY SIZE,
-                STUP-DEC-TXT(CI, 4)         DELIMITED BY SPACE,
-                " "                         DELIMITED BY SIZE,
-                STUP-DEC-PRM(CI, 4)         DELIMITED BY SPACE,
-                " "                         DELIMITED BY SIZE,
-                STUP-DEC-TXT(CI, 5)         DELIMITED BY SPACE,
-                " "                         DELIMITED BY SIZE,
-                STUP-DEC-PRM(CI, 5)         DELIMITED BY SPACE,              
-      INTO AKT-STARTUP-TEXT
-
+      IF VAL OF PRG-OUTF OF SSFRFDEF = SPACES
+         STRING    STUP-DEC-TXT(CI, 1)         DELIMITED BY SPACE,
+                   " "                         DELIMITED BY SIZE,
+                   STUP-DEC-PRM(CI, 1)         DELIMITED BY SPACE,
+                   " "                         DELIMITED BY SIZE,
+                   STUP-DEC-TXT(CI, 2)         DELIMITED BY SPACE,
+                   " "                         DELIMITED BY SIZE,
+                   STUP-DEC-PRM(CI, 2)         DELIMITED BY SPACE,
+                   " "                         DELIMITED BY SIZE,
+                   STUP-DEC-TXT(CI, 3)         DELIMITED BY SPACE,
+                   " "                         DELIMITED BY SIZE,
+                   STUP-DEC-PRM(CI, 3)         DELIMITED BY SPACE,
+                   " "                         DELIMITED BY SIZE,
+                   STUP-DEC-TXT(CI, 4)         DELIMITED BY SPACE,
+                   " "                         DELIMITED BY SIZE,
+                   STUP-DEC-PRM(CI, 4)         DELIMITED BY SPACE,
+                   " "                         DELIMITED BY SIZE,
+                   STUP-DEC-TXT(CI, 5)         DELIMITED BY SPACE,
+                   " "                         DELIMITED BY SIZE,
+                   STUP-DEC-PRM(CI, 5)         DELIMITED BY SPACE              
+         INTO AKT-STARTUP-TEXT
+      ELSE
+         STRING "/OUT "                         DELIMITED BY SIZE,
+                VAL OF PRG-OUTF OF SSFRFDEF     DELIMITED BY SPACE,
+                "/ "                            DELIMITED BY SIZE,
+                STUP-DEC-TXT(CI, 1)             DELIMITED BY SPACE,
+                " "                             DELIMITED BY SIZE,
+                STUP-DEC-PRM(CI, 1)             DELIMITED BY SPACE,
+                " "                             DELIMITED BY SIZE,
+                STUP-DEC-TXT(CI, 2)             DELIMITED BY SPACE,
+                " "                             DELIMITED BY SIZE,
+                STUP-DEC-PRM(CI, 2)             DELIMITED BY SPACE,
+                " "                             DELIMITED BY SIZE,
+                STUP-DEC-TXT(CI, 3)             DELIMITED BY SPACE,
+                " "                             DELIMITED BY SIZE,
+                STUP-DEC-PRM(CI, 3)             DELIMITED BY SPACE,
+                " "                             DELIMITED BY SIZE,
+                STUP-DEC-TXT(CI, 4)             DELIMITED BY SPACE,
+                " "                             DELIMITED BY SIZE,
+                STUP-DEC-PRM(CI, 4)             DELIMITED BY SPACE,
+                " "                             DELIMITED BY SIZE,
+                STUP-DEC-TXT(CI, 5)             DELIMITED BY SPACE,
+                " "                             DELIMITED BY SIZE,
+                STUP-DEC-PRM(CI, 5)             DELIMITED BY SPACE              
+         INTO AKT-STARTUP-TEXT
+      END-IF
      .
  H200-99.
      EXIT.
